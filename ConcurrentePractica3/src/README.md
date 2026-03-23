@@ -1,6 +1,6 @@
-# Cómputo Concurrente 2026-1 | Práctica 1
+# Cómputo Concurrente 2026-1 | Práctica 3: Exclusión Mutua y JMM 
 
-Este repositorio contiene las soluciones para la **Práctica 1** de la materia Cómputo Concurrente. 
+El objetivo es el diseño de algoritmos de exclusión mutua clásicos para 4 hilos, analizando el impacto del **Modelo de Memoria de Java (JMM)** en aspectos como el **Reordenamiento** y la **Visibilidad**.
 
 ## Integrantes
 
@@ -13,41 +13,26 @@ Este repositorio contiene las soluciones para la **Práctica 1** de la materia C
 
 ## 📂 Estructura de Archivos en `src/`
 
-* **`DeterminanteConcurrenteSecuencial.java`**: En este código todo el trabajo lo realiza el hilo principal (main) de principio a fin.
-El método determinanteMatriz3x3 divide el cálculo del determinante en dos grupos: las diagonales positivas y las negativas. Calcula las 6 multiplicaciones por separado y los guarda en variables locales (p1, p2, p3, s1, s2, s3), que se situan en la stack del hilo main.
-por último regresa la suma p1 + p2 + p3 - s1 - s2 - s3. En el main medimos el tiempo con System.nanoTime() antes y después de llamar al método. Este programa no tiene overhead de gestión de concurrencia, lo que hace que sea el más rápido porque no paraleliza nada.
-
-* **`DeterminanteConcurrenteRuntable.java`**: Este código representa una tarea ejecutable pero no es un hilo por sí mismo. Aquí hay una diferencia importante con extender thread:
-
-El objeto Runnable encapsula la tarea que se tiene que hacer y guarda el resultado parcial.
-
-El objeto Thread es el hilo real del sistema operativo que ejecuta esa tarea.
-
-Creamos 6 pares Runnable+Thread, para cada Runnable en el constructor tiene los 3 valores que debe multiplicar (num1, num2, num3), y cuando su hilo ejecuta run(), hace partial = num1 * num2 * num3, una sola multiplicación.
-Los 6 hilos empiezan con start() y corren concurrentemente. Luego el hilo principal llama join() sobre cada uno. Si no se hiciera, el hilo principal podría leer los partial antes de que los hilos los hayan escrito. Cuando todos terminaron se suman y restan los 6 resultados parciales.
-
-* **`DeterminanteConcurrenteDosHilos.java`**: Este código extiende la clase Thread por lo que cada instancia es un hilo. 
-Aquí en lugar de asignar una multiplicación por hilo como en la versión de 6, cada hilo se encarga de la mitad completa del cálculo:
-
-thrPos recibe esPositivo = true y en run() calculamos la suma de las 3 diagonales positivas, haciendo 3 multiplicaciones y 2 sumas.
-thrNeg recibe esPositivo = false y calculamos la suma de las 3 diagonales negativas de la misma manera.
-
-Los 2 hilos entran a la misma referencia de la matriz que está en el heap y al solo leerlas no hay condiciones de carrera ni se necesita más sincronización. Cada hilo guarda su resultado en su propio parcial.
-El hilo principal espera a ambos con join() y después hace la resta final thrPos.parcial - thrNeg.parcial para obtener el determinante.
+* **`PetersonLock.java`**: Implementación base del algoritmo de Peterson para 2 hilos. Para evitar los problemas de reordenamiento del compilador y asegurar la visibilidad de los cambios entre hilos, utilizamos campos **`volatile`** en los arreglos de banderas y la variable (`victim`). 
+* **`Peterson4Threads.java` (Ejercicio 1)**: Extensión del candado de Peterson para soportar 4 hilos mediante una estructura de árbol de torneo (Double Peterson). Implementamos la exclusión mutua en dos niveles: una fase clasificatoria para los hilos (0-1 y 2-3) y una fase final para los ganadores. Incluímos una gestión de IDs específica para evitar colisiones entre los hilos que compiten en cada nodo del árbol.
+* **`PruebaContador.java` (Ejercicio 1)**: Programa de prueba que utiliza un `ExecutorService` para lanzar 400 tareas concurrentes. Cada tarea incrementa un objeto `Contador` protegido por el candado `Peterson4Threads`. El incremento lo hacemos de forma manual sin utilizar la paquetería `Atomic`, confiando en la exclusión mutua del candado.
+* **`BakeryLock.java` (Ejercicio 2)**: Implementación del algoritmo Bakery para 4 hilos. Utilizamos arreglos `flag` y `label` de tamaño 4 marcados como **`volatile`** para garantizar que los tickets de turno se vean de forma consistente en la memoria principal. Se resuelve el acceso mediante una fase de "Doorway" (toma de ticket) y una fase de espera basada en los pares (etiqueta, ID).
+* **`ContadorBakery.java`**: Se implementa de forma sencilla, evitando métodos como `getAndIncrement()` para forzar que la seguridad del programa dependa de la implementación del candado.
+* **`ExecuteBakery.java` (Ejercicio 2)**: Programa que coordina 400 tareas mediante un pool de 4 hilos. Mete justicia que registra cuántas tareas realiza cada hilo mediante un mapa concurrente, permitiendo verificar la distribución y el cumplimiento de la propiedad FCFS.
 
 ## 🚀 Ejecución
 
 ### 1. Compilación
+Asegúrate de estar en la carpeta raíz del proyecto y compila todos los archivos del paquete:
 ```bash
 javac src/*.java
 ```
+
+### 2. Ejecutar Programas
 ```bash
-# Versión Secuencial (Sin hilos)
-java src.DeterminanteConcurrenteSecuencial
+# Ejercicio 1: Peterson para 4 hilos y prueba de consistencia
+java src.PruebaContador
 
-# Versión Multihilo (Runnable - 6 hilos)
-java src.DeterminanteConcurrenteRuntable
-
-# Versión Optimizada (Thread - 2 hilos)
-java src.DeterminanteConcurrenteDosHilos
+# Ejercicio 2: Algoritmo Bakery para 4 hilos y análisis de justicia
+java src.ExecuteBakery
 ```
